@@ -4,37 +4,18 @@
 #%# family=auto
 #%# capabilities=autoconf
 
-my $ret = undef;
+$sock       = '/var/run/php5-fpm.sock';
+$exports    = 'export SCRIPT_NAME=/status && export SCRIPT_FILENAME=/status && export REQUEST_METHOD=GET';
+$response   = `$exports && /usr/bin/cgi-fcgi -bind -connect $sock`;
 
-if (! eval "require LWP::UserAgent;")
-{
-	$ret = "LWP::UserAgent not found";
-}
-
-my $URL = exists $ENV{'url'} ? $ENV{'url'} : "http://127.0.0.1:%d/status";
-my @PORTS = exists $ENV{'ports'} ? split(' ', $ENV{'ports'}) : (80);
 
 if ( defined $ARGV[0] and $ARGV[0] eq "autoconf" )
 {
-	if ($ret)
-	{
-		print "no ($ret)\n";
-		exit 1;
-	}
-
-	my $ua = LWP::UserAgent->new(timeout => 30);
-
-	my @badports;
-	foreach my $port (@PORTS) {
-		my $url = sprintf $URL, $port;
-		my $response = $ua->request(HTTP::Request->new('GET',$url));
-		push @badports, $port unless $response->is_success and $response->content =~ /^accepted conn:/im;
-	}
-	if (@badports) {
-		print "no (phpfpm-status)\n";
+	if ($response =~ /accepted conn:\s+([0-9\.]+)/im) {
+		print "yes\n";
 		exit 1;
 	} else {
-		print "yes\n";
+		print "no\n";
 		exit 0;
 	}
 }
@@ -55,16 +36,8 @@ accepted.min 0
 	exit 0;
 }
 
-foreach my $port (@PORTS)
-{
-    my $ua = LWP::UserAgent->new(timeout => 30);
-    my $url = sprintf $URL, $port;
-    my $response = $ua->request(HTTP::Request->new('GET',$url));
-	if ($response->content =~ /accepted conn:\s+([0-9\.]+)/im) {
-        print "accepted.value $1\n";
-    } else {
-        print "accepted.value U\n";
-    }
+if ($response =~ /accepted conn:\s+([0-9\.]+)/im) {
+	print "accepted.value $1\n";
+} else {
+	print "accepted.value U\n";
 }
-
-# vim:syntax=perl
